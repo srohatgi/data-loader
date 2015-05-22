@@ -257,6 +257,7 @@ if __name__ == "__main__":
 
     check_arg(filename, "please specify a file")
     check_arg(table_name, "please specify table name")
+    check_arg(user, "please specify user")
     check_arg(password, "please specify password")
     check_arg(server, "please specify server")
 
