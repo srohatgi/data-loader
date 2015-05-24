@@ -1,13 +1,12 @@
 __author__ = 'sumeetrohatgi'
 
-import csv
 import logging
 import mysql.connector
 from mysql.connector import errorcode
 import re
 
 
-class Loader:
+class DBWrapper:
     config = {
         'database': 'ebdb',
         'raise_on_warnings': True,
@@ -172,38 +171,3 @@ class Loader:
         except mysql.connector.Error:
             logging.exception("unable to insert: %s", string)
 
-
-def header_row_cleanup(row):
-    row[row.index('GiftMessage')] = 'gift_message'
-    cleaned_row = []
-    for item in row:
-        if len(item) > 0:
-            cleaned_row.append(item.lower())
-    return cleaned_row
-
-
-def data_row_cleanup(row, control_chars):
-    for index, field in enumerate(row):
-        row[index] = field.translate(None, control_chars)
-    return row
-
-
-def parse_file(txt_file, db_loader):
-    control_chars = ''.join(map(chr, range(0, 32) + range(127, 256)))
-    control_chars += "\\'"
-
-    with open(txt_file, 'rb') as tsv_file:
-        tsv_file = csv.reader(tsv_file, delimiter='\t')
-
-        row_number = 0
-        for row in tsv_file:
-            # print row
-            if row_number == 0:
-                db_loader.build_ddl(header_row_cleanup(row))
-            else:
-                db_loader.insert(data_row_cleanup(row, control_chars))
-            row_number += 1
-            if row_number % 500 == 0:
-                logging.debug("processed %s rows", row_number)
-
-        logging.info("processed %s rows", row_number)

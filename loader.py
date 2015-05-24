@@ -1,6 +1,7 @@
 __author__ = 'sumeetrohatgi'
 
 import db_wrapper
+import file_wrapper
 import api_wrapper
 import logging
 
@@ -36,6 +37,7 @@ if __name__ == "__main__":
     table_name = None
     force = False
     dbconn = None
+    apiconn = None
 
     for option, argument in opts:
         if option in ('-f', '--force'):
@@ -46,6 +48,8 @@ if __name__ == "__main__":
             table_name = argument
         elif option in ('-c', '--dbconn'):
             dbconn = argument
+        elif option in ('-a', '--apiconn'):
+            apiconn = argument
         elif option == 'h':
             usage()
         else:
@@ -65,9 +69,9 @@ if __name__ == "__main__":
     logging.info("force flag = %s", force)
 
     try:
-        with db_wrapper.Loader(table_name, dbconn=dbconn, force=force) as loader:
+        with db_wrapper.DBWrapper(table_name, dbconn=dbconn, force=force) as loader:
             # print "loader = ", loader
-            db_wrapper.parse_file(filename, loader)
+            file_wrapper.parse_file(filename, loader.build_ddl, loader.insert)
     except:
         logging.exception("unable to process file %s correctly", filename)
         sys.exit(2)
