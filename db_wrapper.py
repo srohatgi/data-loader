@@ -4,6 +4,7 @@ import csv
 import logging
 import mysql.connector
 from mysql.connector import errorcode
+import re
 
 
 class Loader:
@@ -52,15 +53,17 @@ class Loader:
         }
     }
 
-    def __init__(self, table_name, user, password, host, force=False):
+    def __init__(self, table_name, dbconn, force=False):
         self.conn = None
         self.cursor = None
         self.columns = []
         self.table_name = table_name
         self.force = force
-        self.config["user"] = user
-        self.config["password"] = password
-        self.config["host"] = host
+        p = re.compile('(\w+)@(\w+):(.*)')
+        try:
+            self.config["user"], self.config["password"], self.config["host"] = p.match(dbconn).groups()
+        except:
+            raise Exception('unable to parse dbconn string: {}'.format(dbconn))
 
     def __enter__(self):
         self.open_db_conn()
@@ -123,7 +126,7 @@ class Loader:
         else:
             logging.info("TABLE %s created.", self.table_name)
         finally:
-            if self.cursor is not None:
+            if self.cursor:
                 self.cursor.close()
                 self.cursor = None
 
@@ -166,7 +169,7 @@ class Loader:
                 self.cursor = self.conn.cursor()
             self.cursor.execute(string)
             # print string
-        except mysql.connector.Error as insert_err:
+        except mysql.connector.Error:
             logging.exception("unable to insert: %s", string)
 
 
@@ -204,79 +207,3 @@ def parse_file(txt_file, db_loader):
                 logging.debug("processed %s rows", row_number)
 
         logging.info("processed %s rows", row_number)
-
-
-def usage(message=None):
-    if message is not None:
-        print message
-    print "usage: load_data.py [-h] [-f] -d|--datafile <datafile-path> -t|--table <table_name>"
-
-
-def check_arg(var, message):
-    if var is None:
-        usage(message)
-        sys.exit(1)
-
-if __name__ == "__main__":
-    import getopt
-    import sys
-
-    try:
-        opts, args = getopt.getopt(sys.argv[1:],
-                                   "hft:d:u:p:s:",
-                                   ["help", "force", "table=", "datafile=", "user=", "password=", "server="])
-    except getopt.GetoptError as err:
-        usage(err)
-        sys.exit(1)
-
-    filename = None
-    table_name = None
-    force = False
-    user = None
-    password = None
-    server = None
-
-    for option, argument in opts:
-        if option in ('-f', '--force'):
-            force = True
-        elif option in ('-d', '--datafile'):
-            filename = argument
-        elif option in ('-t', '--table'):
-            table_name = argument
-        elif option in ('-u', '--user'):
-            user = argument
-        elif option in ('-p', '--password'):
-            password = argument
-        elif option in ('-s', '--server'):
-            server = argument
-        elif option == 'h':
-            usage()
-            sys.exit(0)
-        else:
-            assert False, "unhandled option"
-
-    check_arg(filename, "please specify a file")
-    check_arg(table_name, "please specify table name")
-    check_arg(user, "please specify user")
-    check_arg(password, "please specify password")
-    check_arg(server, "please specify server")
-
-    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                        filename='run.log',
-                        filemode='a',
-                        level=logging.DEBUG)
-
-    logging.info("*"*20)
-    logging.info("starting to load filename: %s into %s", filename, table_name)
-    logging.info("force flag = %s", force)
-
-    try:
-        with Loader(table_name, user=user, password=password, host=server, force=force) as loader:
-            # print "loader = ", loader
-            parse_file(filename, loader)
-    except:
-        logging.exception("unable to process file %s correctly", filename)
-        sys.exit(2)
-    finally:
-        logging.info("finished loading filename: %s into %s", filename, table_name)
-        logging.info("*"*20)
