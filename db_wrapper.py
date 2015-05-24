@@ -97,49 +97,56 @@ class DBWrapper:
                 self.columns.append({i: {'type': 'char', 'length': 1}})
 
         # print("columns: {}".format(self.columns))
-        string = "CREATE TABLE `{}` (".format(self.table_name)
+        sql = ["CREATE TABLE `{}` (".format(self.table_name)]
 
         # column definitions
         first = True
         for col in self.columns:
             # print col, self.cols[col]
             name = col.keys()[0]
+
             if not first:
-                string += ","
+                sql.append(",")
             else:
                 first = False
-            string += "`{}` {}".format(name, col[name]['type'])
-            if col[name]['length']:
-                string += "({})".format(col[name]['length'])
-            if 'auto' in col[name]:
-                string += " NOT NULL AUTO_INCREMENT"
-            else:
-                string += " NULL"
-            if 'default' in col[name]:
-                string += " DEFAULT '{}'".format(col[name]['default'])
 
-        string += ", PRIMARY KEY (`row_num`)"
+            sql.append("`{}` {}".format(name, col[name]['type']))
+
+            if col[name]['length']:
+                sql.append("({})".format(col[name]['length']))
+
+            if 'auto' in col[name]:
+                sql.append(" NOT NULL AUTO_INCREMENT")
+            else:
+                sql.append(" NULL")
+
+            if 'default' in col[name]:
+                sql.append(" DEFAULT '{}'".format(col[name]['default']))
+
+        sql.append(", PRIMARY KEY (`row_num`)")
 
         # indexes
         for col in self.columns:
             # print col, self.cols[col]
             name = col.keys()[0]
             if 'index' in col[name]:
-                string += ", INDEX(`{}`)".format(name)
+                sql.append(", INDEX(`{}`)".format(name))
 
-        string += ") Engine=InnoDB"
+        sql.append(") Engine=InnoDB")
 
         try:
             self.open_db_conn()
             self.cursor = self.conn.cursor()
 
-            logging.info("DDL=%s", string)
+            sql_string = ''.join(sql)
+
+            logging.info("DDL=%s", sql_string)
 
             if self.force:
                 logging.info("Dropping table %s", self.table_name)
                 self.cursor.execute("drop table if exists {}".format(self.table_name))
 
-            self.cursor.execute(string)
+            self.cursor.execute(sql_string)
         except mysql.connector.Error as db_err:
             if db_err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
                 logging.warn("TABLE %s already exists.", self.table_name)
@@ -156,9 +163,7 @@ class DBWrapper:
                 self.cursor = None
 
     def insert(self, row):
-        string = "insert into {} ".format(self.table_name)
-
-        string += " ("
+        sql = ["insert into {} (".format(self.table_name)]
 
         first = True
         for col in self.columns:
@@ -166,43 +171,48 @@ class DBWrapper:
             if name == 'row_num' or name == 'status':
                 continue
             if not first:
-                string += ","
-            string += name
+                sql.append(",")
+            sql.append(name)
             first = False
 
-        string += ") values ("
+        sql.append(") values (")
 
         first = True
         for i in range(0, len(self.columns) - 2):
             if not first:
-                string += ","
+                sql.append(",")
+            else:
+                first = False
+
             name = self.columns[i + 2].keys()[0]
             column_type = self.columns[i + 2][name]['type']
             value = row[i]
+
             if column_type == 'int':
-                string += "{}".format(value)
+                sql.append("{}".format(value))
             elif column_type == 'date':
                 if value == "NULL":
-                    string += "NULL"
+                    sql.append("NULL")
                 else:
                     value = value[:10]
                     if value.find(' ') != -1:
                         value = value[:value.index(' ')]
-                    string += "str_to_date('{}','%m/%d/%Y')".format(value)
+                    sql.append("str_to_date('{}','%m/%d/%Y')".format(value))
             else:
-                string += "'{}'".format(value)
-            first = False
+                sql.append("'{}'".format(value))
 
-        string += ")"
+        sql.append(")")
+
+        sql_string = ''.join(sql)
 
         try:
             if self.cursor is None:
                 self.cursor = self.conn.cursor()
-            self.cursor.execute(string)
+            self.cursor.execute(sql_string)
             # print string
             return True
         except mysql.connector.Error:
-            logging.exception("unable to insert: %s", string)
+            logging.exception("unable to insert: %s", sql_string)
             return False
 
     def process_rows(self, make_call):
