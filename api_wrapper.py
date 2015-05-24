@@ -3,8 +3,24 @@ __author__ = 'sumeetrohatgi'
 import requests
 import json
 import logging
-import sys
+import re
 
+
+class ReminderAPI:
+
+    def __init__(self, apiconn):
+        logging.debug("apiconn: %s", apiconn)
+        p = re.compile('(\w+)@(.*)')
+        try:
+            auth, self.uri = p.match(apiconn).groups()
+            self.auth = {'X-ST-Auth': auth}
+        except:
+            raise Exception('unable to parse apiconn: {}'.format(apiconn))
+
+    def make_call(self, row):
+        data = json.dumps(row)
+        r = requests.post(self.uri, data=data, headers=self.auth)
+        logging.debug(r)
 
 payload = {
     'email_id': '',

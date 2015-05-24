@@ -56,7 +56,7 @@ class DBWrapper:
         self.conn = None
         self.cursor = None
         self.columns = []
-        self.table_name = table_name
+        self.table_name = str(table_name).lower()
         self.force = force
         p = re.compile('(\w+)@(\w+):(.*)')
         try:
@@ -83,7 +83,12 @@ class DBWrapper:
             self.conn.close()
 
     def build_ddl(self, items):
-        string = "CREATE TABLE `{}` (`row_num` int(11) NOT NULL AUTO_INCREMENT".format(self.table_name)
+        string = "CREATE TABLE `{}` (" \
+                 "`row_num` int(11) NOT NULL AUTO_INCREMENT," \
+                 "`status` char(3) NOT NULL DEFAULT `NEW`".format(self.table_name)
+
+        predefined_columns = [{'row_num': {'type': 'int', 'length': 11}},
+                              {'status': {'type': 'char', 'length': 3}}]
 
         for i in items:
             # print i, self.col_config.has_key(i)
@@ -98,10 +103,11 @@ class DBWrapper:
             # print col, self.cols[col]
             name = col.keys()[0]
             string += ",`{}` {}".format(name, col[name]['type'])
-            if col[name]['length'] is None:
-                string += " NULL"
-            else:
-                string += "({}) NULL".format(col[name]['length'])
+            if col[name]['length']:
+                string += "({})".format(col[name]['length'])
+            string += " NULL"
+
+        self.columns = predefined_columns + self.columns
 
         string += ", PRIMARY KEY (`row_num`)) Engine=InnoDB"
 
@@ -119,11 +125,13 @@ class DBWrapper:
         except mysql.connector.Error as db_err:
             if db_err.errno == errorcode.ER_TABLE_EXISTS_ERROR:
                 logging.warn("TABLE %s already exists.", self.table_name)
+                return False
             else:
                 logging.exception("creating %s: %s", self.table_name, db_err.msg)
                 raise db_err
         else:
             logging.info("TABLE %s created.", self.table_name)
+            return True
         finally:
             if self.cursor:
                 self.cursor.close()
@@ -136,6 +144,8 @@ class DBWrapper:
         first = True
         for col in self.columns:
             name = col.keys()[0]
+            if name == 'row_num':
+                continue
             if not first:
                 string += ","
             string += name
@@ -168,6 +178,22 @@ class DBWrapper:
                 self.cursor = self.conn.cursor()
             self.cursor.execute(string)
             # print string
+            return True
         except mysql.connector.Error:
             logging.exception("unable to insert: %s", string)
+            return False
 
+    def process_rows(self, make_call):
+        string = "select * from {} where status != 'NEW'".format(self.table_name)
+
+        try:
+            if not self.cursor:
+                self.cursor = self.conn.cursor()
+            self.cursor.execute(string)
+
+            for row in self.cursor:
+                make_call(dict(zip(self.cursor.column_names, row)))
+                return True
+        except:
+            logging.exception("unable to select/ make_call")
+            return False

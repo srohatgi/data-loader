@@ -12,7 +12,7 @@ def usage(message=None):
         print message
         code = 1
     print "usage: loader.py [-h] [-f] -d|--datafile <datafile-path> " \
-          "-t|--table <table_name> -c|--dbconn <db connection>"
+          "-t|--table <table_name> -c|--dbconn <db connection> -a|--apiconn <api uri conn>"
     sys.exit(code)
 
 
@@ -58,6 +58,7 @@ if __name__ == "__main__":
     check_arg(filename, "please specify a file")
     check_arg(table_name, "please specify table name")
     check_arg(dbconn, "please specify database connection string")
+    check_arg(apiconn, "please specify api connection string")
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         filename='run.log',

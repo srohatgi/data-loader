@@ -30,7 +30,8 @@ def parse_file(txt_file, header_row_fn, data_row_fn):
         for row in tsv_file:
             # print row
             if row_number == 0:
-                header_row_fn(header_row_cleanup(row))
+                if not header_row_fn(header_row_cleanup(row)):
+                    return
             else:
                 data_row_fn(data_row_cleanup(row, control_chars))
             row_number += 1
