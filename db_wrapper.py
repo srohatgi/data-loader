@@ -16,7 +16,8 @@ class DBWrapper:
     col_config = {
         'email_id': {
             'type': 'char',
-            'length': 255
+            'length': 255,
+            'index': True
         },
         'brand_id': {
             'type': 'int',
@@ -60,6 +61,7 @@ class DBWrapper:
         self.force = force
         p = re.compile('(\w+)@(\w+):(.*)')
         try:
+            logging.debug("dbconn: %s", dbconn)
             self.config["user"], self.config["password"], self.config["host"] = p.match(dbconn).groups()
         except:
             raise Exception('unable to parse dbconn string: {}'.format(dbconn))
@@ -83,12 +85,9 @@ class DBWrapper:
             self.conn.close()
 
     def build_ddl(self, items):
-        string = "CREATE TABLE `{}` (" \
-                 "`row_num` int(11) NOT NULL AUTO_INCREMENT," \
-                 "`status` char(3) NOT NULL DEFAULT `NEW`".format(self.table_name)
 
-        predefined_columns = [{'row_num': {'type': 'int', 'length': 11}},
-                              {'status': {'type': 'char', 'length': 3}}]
+        self.columns.append({'row_num': {'type': 'int', 'length': 11, 'auto': True}})
+        self.columns.append({'status': {'type': 'char', 'length': 3, 'default': 'NEW', 'index': True}})
 
         for i in items:
             # print i, self.col_config.has_key(i)
@@ -98,18 +97,37 @@ class DBWrapper:
                 self.columns.append({i: {'type': 'char', 'length': 1}})
 
         # print("columns: {}".format(self.columns))
+        string = "CREATE TABLE `{}` (".format(self.table_name)
 
+        # column definitions
+        first = True
         for col in self.columns:
             # print col, self.cols[col]
             name = col.keys()[0]
-            string += ",`{}` {}".format(name, col[name]['type'])
+            if not first:
+                string += ","
+            else:
+                first = False
+            string += "`{}` {}".format(name, col[name]['type'])
             if col[name]['length']:
                 string += "({})".format(col[name]['length'])
-            string += " NULL"
+            if 'auto' in col[name]:
+                string += " NOT NULL AUTO_INCREMENT"
+            else:
+                string += " NULL"
+            if 'default' in col[name]:
+                string += " DEFAULT '{}'".format(col[name]['default'])
 
-        self.columns = predefined_columns + self.columns
+        string += ", PRIMARY KEY (`row_num`)"
 
-        string += ", PRIMARY KEY (`row_num`)) Engine=InnoDB"
+        # indexes
+        for col in self.columns:
+            # print col, self.cols[col]
+            name = col.keys()[0]
+            if 'index' in col[name]:
+                string += ", INDEX(`{}`)".format(name)
+
+        string += ") Engine=InnoDB"
 
         try:
             self.open_db_conn()
@@ -119,7 +137,7 @@ class DBWrapper:
 
             if self.force:
                 logging.info("Dropping table %s", self.table_name)
-                self.cursor.execute("drop table {}".format(self.table_name))
+                self.cursor.execute("drop table if exists {}".format(self.table_name))
 
             self.cursor.execute(string)
         except mysql.connector.Error as db_err:
@@ -141,34 +159,38 @@ class DBWrapper:
         string = "insert into {} ".format(self.table_name)
 
         string += " ("
+
         first = True
         for col in self.columns:
             name = col.keys()[0]
-            if name == 'row_num':
+            if name == 'row_num' or name == 'status':
                 continue
             if not first:
                 string += ","
             string += name
             first = False
+
         string += ") values ("
 
         first = True
-        for i in range(0, len(self.columns)):
+        for i in range(0, len(self.columns) - 2):
             if not first:
                 string += ","
-            column_type = self.columns[i][self.columns[i].keys()[0]]['type']
+            name = self.columns[i + 2].keys()[0]
+            column_type = self.columns[i + 2][name]['type']
+            value = row[i]
             if column_type == 'int':
-                string += "{}".format(row[i])
+                string += "{}".format(value)
             elif column_type == 'date':
-                if row[i] == "NULL":
+                if value == "NULL":
                     string += "NULL"
                 else:
-                    value = row[i][:10]
+                    value = value[:10]
                     if value.find(' ') != -1:
                         value = value[:value.index(' ')]
                     string += "str_to_date('{}','%m/%d/%Y')".format(value)
             else:
-                string += "'{}'".format(row[i])
+                string += "'{}'".format(value)
             first = False
 
         string += ")"
@@ -184,16 +206,31 @@ class DBWrapper:
             return False
 
     def process_rows(self, make_call):
-        string = "select * from {} where status != 'NEW'".format(self.table_name)
+        string = "select * from {} where status = 'NEW'".format(self.table_name)
+        update_string = "update {} set status = 'PRC' where row_num = ".format(self.table_name)
 
+        update_conn = None
+        update_cursor = None
         try:
             if not self.cursor:
                 self.cursor = self.conn.cursor()
+
+            update_conn = mysql.connector.connect(**self.config)
+            update_cursor = update_conn.cursor()
+
+            logging.debug("select query: %s", string)
             self.cursor.execute(string)
 
             for row in self.cursor:
-                make_call(dict(zip(self.cursor.column_names, row)))
-                return True
+                row_dict = dict(zip(self.cursor.column_names, row))
+                make_call(row_dict)
+                update_cursor.execute(update_string + str(row_dict['row_num']))
+            return True
         except:
             logging.exception("unable to select/ make_call")
             return False
+        finally:
+            if update_cursor:
+                update_cursor.close()
+            if update_conn:
+                update_conn.close()
