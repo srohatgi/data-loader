@@ -28,8 +28,8 @@ if __name__ == "__main__":
     opts = None
     try:
         opts, args = getopt.getopt(sys.argv[1:],
-                                   "hft:d:c:",
-                                   ["help", "force", "table=", "datafile=", "dbconn="])
+                                   "hft:d:c:a:",
+                                   ["help", "force", "table=", "datafile=", "dbconn=", "apiconn="])
     except getopt.GetoptError as err:
         usage(err)
 
@@ -70,9 +70,11 @@ if __name__ == "__main__":
     logging.info("force flag = %s", force)
 
     try:
+        caller = api_wrapper.ReminderAPI(apiconn)
         with db_wrapper.DBWrapper(table_name, dbconn=dbconn, force=force) as loader:
             # print "loader = ", loader
             file_wrapper.parse_file(filename, loader.build_ddl, loader.insert)
+            loader.process_rows(caller.make_call)
     except:
         logging.exception("unable to process file %s correctly", filename)
         sys.exit(2)
