@@ -2,7 +2,6 @@ __author__ = 'sumeetrohatgi'
 
 import db_wrapper
 import file_wrapper
-import api_wrapper
 import logging
 
 
@@ -70,11 +69,10 @@ if __name__ == "__main__":
     logging.info("force flag = %s", force)
 
     try:
-        caller = api_wrapper.ReminderAPI(apiconn)
         with db_wrapper.DBWrapper(table_name, dbconn=dbconn, force=force) as loader:
             # print "loader = ", loader
             file_wrapper.parse_file(filename, loader.build_ddl, loader.insert)
-            loader.process_rows(caller.make_call)
+            loader.process_rows()
     except:
         logging.exception("unable to process file %s correctly", filename)
         sys.exit(2)
