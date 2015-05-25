@@ -216,7 +216,7 @@ class DBWrapper:
             return False
 
     def process_rows(self, make_call):
-        string = "select * from {} where status = 'NEW'".format(self.table_name)
+        string = "select * from {} where status = 'NEW' and email_id != ''".format(self.table_name)
         update_string = "update {} set status = 'PRC' where row_num = ".format(self.table_name)
 
         update_conn = None
@@ -233,8 +233,36 @@ class DBWrapper:
 
             for row in self.cursor:
                 row_dict = dict(zip(self.cursor.column_names, row))
-                make_call(row_dict)
+                owner = self.select_owner(email=row_dict['email_id'],
+                                          fname=row_dict['first_name'],
+                                          lname=row_dict['last_name'],
+                                          acct_creation=row_dict['last_transaction_date'],
+                                          brand=row_dict['brand_id'],
+                                          cursor=update_cursor)
+
+                occasion = self.map_occasion(row_dict)
+
+                reminder_id = self.build_reminder(owner=owner,
+                                                  created=row_dict['last_transaction_date'],
+                                                  occ_date=row['occasion_date'],
+                                                  occasion=occasion,
+                                                  note=row_dict['gift_message'],
+                                                  brand_id=row_dict['brand_id'],
+                                                  cursor=update_cursor)
+
+                contact_id = self.build_contact(fname=row_dict['contact_first_name'],
+                                                lname=row_dict['contact_last_name'],
+                                                reminder_id=reminder_id,
+                                                cursor=update_cursor)
+
                 update_cursor.execute(update_string + str(row_dict['row_num']))
+
+                logging.info('%s generated into: owner(%s) reminder(%s), contact(%s)',
+                             row_dict['email_id'],
+                             owner,
+                             reminder_id,
+                             contact_id)
+
             return True
         except:
             logging.exception("unable to select/ make_call")
@@ -244,3 +272,80 @@ class DBWrapper:
                 update_cursor.close()
             if update_conn:
                 update_conn.close()
+
+    def get_cursor(self, cursor=None):
+        if not cursor:
+            self.open_db_conn()
+            self.cursor = self.conn.cursor()
+            return self.cursor
+        else:
+            return cursor
+
+    @staticmethod
+    def map_occasion(row):
+        if row['mothersday'] == '1':
+            return 26
+        elif row['xmas'] == '1':
+            return 29
+        elif row['halloween'] == '1':
+            return 35
+        elif row['anniversary'] == '1':
+            return 6
+        else:
+            return 3  # default is bday
+
+
+    def select_owner(self, email, fname, lname, acct_creation, brand, cursor=None):
+        cursor = self.get_cursor(cursor=cursor)
+
+        sql_string = "SELECT id FROM sruser where email = '{}'".format(email)
+
+        cursor.execute(sql_string)
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+
+        # lets create a new user
+        sql_string = "INSERT INTO sruser (account_active, account_creation_date, email, brand) " \
+                     "VALUES  (1, '{}', '{}', '{}')".format(acct_creation.strftime('%Y/%m/%d'), email, brand)
+
+        cursor.execute(sql_string)
+        owner = cursor.last_row_id
+
+        sql_string = "INSERT INTO sruser_profile (first_name, last_name, version, owner) " \
+                     "VALUES  ('{}', '{}', 0, {})".format(fname, lname, owner)
+
+        cursor.execute(sql_string)
+        return owner
+
+    def build_reminder(self, owner, created, occ_date, note, brand_id, occasion, cursor=None):
+        cursor = self.get_cursor(cursor)
+
+        sql_string = "INSERT INTO reminder (active, short_description, version, " \
+                     "created, day_no, month_no, special_note, " \
+                     "updated, year_no, brand_id, occasion, owner) " \
+                     "VALUES (1, '', 0, " \
+                     "'{}', '{}', '{}', '{}', " \
+                     "'{}', '{}', {}, {})".format(created.strftime('%Y/%m/%d'),
+                                                  occ_date.strftime('%d'),
+                                                  occ_date.strftime('%m'),
+                                                  note,
+                                                  created.strftime('%Y/%m/%d'),
+                                                  occ_date.strftime('%Y'),
+                                                  brand_id,
+                                                  occasion,
+                                                  owner)
+
+        cursor.execute(sql_string)
+
+        return cursor.last_row_id
+
+    def build_contact(self, fname, lname, reminder_id, cursor=None):
+        cursor = self.get_cursor(cursor)
+
+        sql_string = "INSERT INTO contact (first_name, last_name, version, reminder) " \
+                     "VALUES  ('{}', '{}', 0, {})".format(fname, lname, reminder_id)
+
+        cursor.execute(sql_string)
+
+        return cursor.last_row_id
