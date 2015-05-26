@@ -88,6 +88,9 @@ class DBWrapper:
 
         self.columns.append({'row_num': {'type': 'int', 'length': 11, 'auto': True}})
         self.columns.append({'status': {'type': 'char', 'length': 3, 'default': 'NEW', 'index': True}})
+        self.columns.append({'reminder_id': {'type': 'int', 'length': 11, 'index': True}})
+        self.columns.append({'contact_id': {'type': 'int', 'length': 11, 'index': True}})
+        self.columns.append({'owner': {'type': 'int', 'length': 11, 'index': True}})
 
         for i in items:
             # print i, self.col_config.has_key(i)
@@ -164,11 +167,12 @@ class DBWrapper:
 
     def insert(self, row):
         sql = ["insert into {} (".format(self.table_name)]
+        skip_cols = ['row_num', 'status', 'reminder_id', 'contact_id', 'owner']
 
         first = True
         for col in self.columns:
             name = col.keys()[0]
-            if name == 'row_num' or name == 'status':
+            if name in skip_cols:
                 continue
             if not first:
                 sql.append(",")
@@ -178,14 +182,14 @@ class DBWrapper:
         sql.append(") values (")
 
         first = True
-        for i in range(0, len(self.columns) - 2):
+        for i in range(0, len(self.columns) - len(skip_cols)):
             if not first:
                 sql.append(",")
             else:
                 first = False
 
-            name = self.columns[i + 2].keys()[0]
-            column_type = self.columns[i + 2][name]['type']
+            name = self.columns[i + len(skip_cols)].keys()[0]
+            column_type = self.columns[i + len(skip_cols)][name]['type']
             value = row[i]
 
             if column_type == 'int':
@@ -199,6 +203,8 @@ class DBWrapper:
                         value = value[:value.index(' ')]
                     sql.append("str_to_date('{}','%m/%d/%Y')".format(value))
             else:
+                if name == 'email_id':
+                    value = value.lower()
                 sql.append("'{}'".format(value))
 
         sql.append(")")
@@ -216,8 +222,7 @@ class DBWrapper:
             return False
 
     def process_rows(self):
-        string = "select * from {} where status = 'NEW' and email_id != ''".format(self.table_name)
-        update_string = "update {} set status = 'PRC' where row_num = ".format(self.table_name)
+        string = "select * from {name} where status = 'NEW' and email_id != ''".format(name=self.table_name)
 
         update_conn = None
         update_cursor = None
@@ -256,7 +261,19 @@ class DBWrapper:
                                                 reminder_id=reminder_id,
                                                 cursor=update_cursor)
 
-                update_cursor.execute(update_string + str(row_dict['row_num']))
+                update_string = "update {name} set " \
+                                "status = 'PRC', " \
+                                "reminder_id = {reminder_id}, " \
+                                "contact_id = {contact_id}, " \
+                                "owner = {owner} " \
+                                "where row_num = {row_num}"\
+                    .format(name=self.table_name,
+                            reminder_id=reminder_id,
+                            contact_id=contact_id,
+                            owner=owner,
+                            row_num=row_dict['row_num'])
+
+                update_cursor.execute(update_string)
 
                 logging.info('%s generated into: owner(%s) reminder(%s), contact(%s)',
                              row_dict['email_id'],
@@ -285,7 +302,7 @@ class DBWrapper:
     def select_owner(self, email, fname, lname, acct_creation, brand, cursor=None):
         cursor = self.get_cursor(cursor=cursor)
 
-        sql_string = "SELECT id FROM sruser where email = '{}'".format(email)
+        sql_string = "SELECT id FROM sruser where email = '{email}'".format(email=email)
 
         cursor.execute(sql_string)
         row = cursor.fetchone()
@@ -294,7 +311,10 @@ class DBWrapper:
 
         # lets create a new user
         sql_string = "INSERT INTO sruser (account_active, account_creation_date, email, brand) " \
-                     "VALUES  (1, '{}', '{}', '{}')".format(acct_creation.strftime('%Y/%m/%d'), email, brand)
+                     "VALUES  (1, '{created}', '{email}', '{brand}')"\
+            .format(created=acct_creation.strftime('%Y/%m/%d'),
+                    email=email,
+                    brand=brand)
 
         logging.debug("inserting into sruser: %s", sql_string)
 
@@ -302,7 +322,10 @@ class DBWrapper:
         owner = cursor.lastrowid
 
         sql_string = "INSERT INTO sruser_profile (first_name, last_name, version, owner) " \
-                     "VALUES  ('{}', '{}', 0, {})".format(fname, lname, owner)
+                     "VALUES  ('{fname}', '{lname}', 0, {owner})"\
+            .format(fname=fname,
+                    lname=lname,
+                    owner=owner)
 
         logging.debug("inserting into sruser_profile: %s", sql_string)
 
@@ -372,7 +395,10 @@ class DBWrapper:
             return row[0]
 
         sql_string = "INSERT INTO contact (first_name, last_name, version, reminder) " \
-                     "VALUES  ('{}', '{}', 0, {})".format(fname, lname, reminder_id)
+                     "VALUES  ('{fname}', '{lname}', 0, {reminder_id})"\
+            .format(fname=fname,
+                    lname=lname,
+                    reminder_id=reminder_id)
 
         logging.debug("inserting into contact: %s", sql_string)
 
