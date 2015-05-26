@@ -100,7 +100,7 @@ class DBWrapper:
                 self.columns.append({i: {'type': 'char', 'length': 1}})
 
         # print("columns: {}".format(self.columns))
-        sql = ["CREATE TABLE `{}` (".format(self.table_name)]
+        sql = ["CREATE TABLE `{name}` (".format(name=self.table_name)]
 
         # column definitions
         first = True
@@ -113,10 +113,10 @@ class DBWrapper:
             else:
                 first = False
 
-            sql.append("`{}` {}".format(name, col[name]['type']))
+            sql.append("`{col_name}` {col_type}".format(col_name=name, col_type=col[name]['type']))
 
             if col[name]['length']:
-                sql.append("({})".format(col[name]['length']))
+                sql.append("({col_len})".format(col_len=col[name]['length']))
 
             if 'auto' in col[name]:
                 sql.append(" NOT NULL AUTO_INCREMENT")
@@ -124,7 +124,7 @@ class DBWrapper:
                 sql.append(" NULL")
 
             if 'default' in col[name]:
-                sql.append(" DEFAULT '{}'".format(col[name]['default']))
+                sql.append(" DEFAULT '{col_default}'".format(col_default=col[name]['default']))
 
         sql.append(", PRIMARY KEY (`row_num`)")
 
@@ -133,7 +133,7 @@ class DBWrapper:
             # print col, self.cols[col]
             name = col.keys()[0]
             if 'index' in col[name]:
-                sql.append(", INDEX(`{}`)".format(name))
+                sql.append(", INDEX(`{col_index}`)".format(col_index=name))
 
         sql.append(") Engine=InnoDB")
 
@@ -147,7 +147,7 @@ class DBWrapper:
 
             if self.force:
                 logging.info("Dropping table %s", self.table_name)
-                self.cursor.execute("drop table if exists {}".format(self.table_name))
+                self.cursor.execute("drop table if exists {name}".format(name=self.table_name))
 
             self.cursor.execute(sql_string)
         except mysql.connector.Error as db_err:
