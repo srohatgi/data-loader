@@ -166,7 +166,7 @@ class DBWrapper:
                 self.cursor = None
 
     def insert(self, row):
-        sql = ["insert into {} (".format(self.table_name)]
+        sql = ["insert into {table_name} (".format(table_name=self.table_name)]
         skip_cols = ['row_num', 'status', 'reminder_id', 'contact_id', 'owner']
 
         first = True
@@ -193,7 +193,7 @@ class DBWrapper:
             value = row[i]
 
             if column_type == 'int':
-                sql.append("{}".format(value))
+                sql.append("{value}".format(value=value))
             elif column_type == 'date':
                 if value == "NULL":
                     sql.append("NULL")
@@ -201,11 +201,11 @@ class DBWrapper:
                     value = value[:10]
                     if value.find(' ') != -1:
                         value = value[:value.index(' ')]
-                    sql.append("str_to_date('{}','%m/%d/%Y')".format(value))
+                    sql.append("str_to_date('{date_value}','%m/%d/%Y')".format(date_value=value))
             else:
                 if name == 'email_id':
                     value = value.lower()
-                sql.append("'{}'".format(value))
+                sql.append("'{string_value}'".format(string_value=value))
 
         sql.append(")")
 
