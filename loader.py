@@ -11,7 +11,7 @@ def usage(message=None):
         print message
         code = 1
     print "usage: loader.py [-h] [-f] -d|--datafile <datafile-path> " \
-          "-t|--table <table_name> -c|--dbconn <db connection> -a|--apiconn <api uri conn>"
+          "-t|--table <table_name> -c|--dbconn <db connection>"
     sys.exit(code)
 
 
@@ -27,8 +27,8 @@ if __name__ == "__main__":
     opts = None
     try:
         opts, args = getopt.getopt(sys.argv[1:],
-                                   "hft:d:c:a:",
-                                   ["help", "force", "table=", "datafile=", "dbconn=", "apiconn="])
+                                   "hft:d:c:",
+                                   ["help", "force", "table=", "datafile=", "dbconn="])
     except getopt.GetoptError as err:
         usage(err)
 
@@ -36,7 +36,6 @@ if __name__ == "__main__":
     table_name = None
     force = False
     dbconn = None
-    apiconn = None
 
     for option, argument in opts:
         if option in ('-f', '--force'):
@@ -47,8 +46,6 @@ if __name__ == "__main__":
             table_name = argument
         elif option in ('-c', '--dbconn'):
             dbconn = argument
-        elif option in ('-a', '--apiconn'):
-            apiconn = argument
         elif option == 'h':
             usage()
         else:
@@ -57,7 +54,6 @@ if __name__ == "__main__":
     check_arg(filename, "please specify a file")
     check_arg(table_name, "please specify table name")
     check_arg(dbconn, "please specify database connection string")
-    check_arg(apiconn, "please specify api connection string")
 
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         filename='run.log',
