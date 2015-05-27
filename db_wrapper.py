@@ -240,11 +240,11 @@ class DBWrapper:
                 row_dict = dict(zip(self.cursor.column_names, row))
 
                 owner = self.build_owner(email=row_dict['email_id'],
-                                          fname=row_dict['first_name'],
-                                          lname=row_dict['last_name'],
-                                          acct_creation=row_dict['last_transaction_date'],
-                                          brand=row_dict['brand_id'],
-                                          cursor=update_cursor)
+                                         fname=row_dict['first_name'],
+                                         lname=row_dict['last_name'],
+                                         acct_creation=row_dict['last_transaction_date'],
+                                         brand=row_dict['brand_id'],
+                                         cursor=update_cursor)
 
                 occasion = map_occasion(row_dict)
 
@@ -420,7 +420,7 @@ class DBWrapper:
         if row:
             if row[0] == 4:
                 return
-            else:
+            elif row[0] > 0:
                 sql_string = "DELETE from reminder_frequency where reminder = {reminder}".format(reminder=reminder_id)
 
                 assert reminder_id is not None
