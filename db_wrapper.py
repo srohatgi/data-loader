@@ -239,7 +239,7 @@ class DBWrapper:
             for row in self.cursor:
                 row_dict = dict(zip(self.cursor.column_names, row))
 
-                owner = self.select_owner(email=row_dict['email_id'],
+                owner = self.build_owner(email=row_dict['email_id'],
                                           fname=row_dict['first_name'],
                                           lname=row_dict['last_name'],
                                           acct_creation=row_dict['last_transaction_date'],
@@ -255,6 +255,10 @@ class DBWrapper:
                                                   note=row_dict['gift_message'],
                                                   brand_id=row_dict['brand_id'],
                                                   cursor=update_cursor)
+
+                self.build_reminder_frequency(brand_id=row_dict['brand_id'],
+                                              reminder_id=reminder_id,
+                                              cursor=update_cursor)
 
                 contact_id = self.build_contact(fname=row_dict['contact_first_name'],
                                                 lname=row_dict['contact_last_name'],
@@ -299,7 +303,7 @@ class DBWrapper:
         else:
             return cursor
 
-    def select_owner(self, email, fname, lname, acct_creation, brand, cursor=None):
+    def build_owner(self, email, fname, lname, acct_creation, brand, cursor=None):
         cursor = self.get_cursor(cursor=cursor)
 
         sql_string = "SELECT id FROM sruser where email = '{email}'".format(email=email)
@@ -405,6 +409,38 @@ class DBWrapper:
         cursor.execute(sql_string)
 
         return cursor.lastrowid
+
+    def build_reminder_frequency(self, brand_id, reminder_id, cursor=None):
+        sql_string = "SELECT count(*) from reminder_frequency where reminder = {reminder}".format(reminder=reminder_id)
+
+        logging.debug("selecting from reminder_frequency: %s", sql_string)
+
+        cursor.execute(sql_string)
+
+        row = cursor.fetchone()
+        if row:
+            if row[0] == 4:
+                return
+            else:
+                sql_string = "DELETE from reminder_frequency where reminder = {reminder}".format(reminder=reminder_id)
+
+                assert reminder_id is not None
+
+                logging.debug("deleting from reminder_frequency: %s", sql_string)
+                cursor.execute(sql_string)
+
+        sql_string = "INSERT INTO reminder_frequency (days_before, version, channel, reminder) VALUES " \
+                     "(0, 0, {brand}, {reminder}), " \
+                     "(1, 0, {brand}, {reminder}), " \
+                     "(7, 0, {brand}, {reminder}), " \
+                     "(14, 0, {brand}, {reminder})"\
+            .format(brand=brand_id, reminder=reminder_id)
+
+        logging.debug("inserting into reminder_frequency: %s", sql_string)
+        cursor.execute(sql_string)
+
+        return
+
 
 
 def map_occasion(row):
