@@ -256,8 +256,7 @@ class DBWrapper:
                                                   brand_id=row_dict['brand_id'],
                                                   cursor=update_cursor)
 
-                self.build_reminder_frequency(brand_id=row_dict['brand_id'],
-                                              reminder_id=reminder_id,
+                self.build_reminder_frequency(reminder_id=reminder_id,
                                               cursor=update_cursor)
 
                 contact_id = self.build_contact(fname=row_dict['contact_first_name'],
@@ -410,7 +409,7 @@ class DBWrapper:
 
         return cursor.lastrowid
 
-    def build_reminder_frequency(self, brand_id, reminder_id, cursor=None):
+    def build_reminder_frequency(self, reminder_id, cursor=None):
         sql_string = "SELECT count(*) from reminder_frequency where reminder = {reminder}".format(reminder=reminder_id)
 
         logging.debug("selecting from reminder_frequency: %s", sql_string)
@@ -430,11 +429,11 @@ class DBWrapper:
                 cursor.execute(sql_string)
 
         sql_string = "INSERT INTO reminder_frequency (days_before, version, channel, reminder) VALUES " \
-                     "(0, 0, {brand}, {reminder}), " \
-                     "(1, 0, {brand}, {reminder}), " \
-                     "(7, 0, {brand}, {reminder}), " \
-                     "(14, 0, {brand}, {reminder})"\
-            .format(brand=brand_id, reminder=reminder_id)
+                     "(0, 0, 3, {reminder}), " \
+                     "(1, 0, 3, {reminder}), " \
+                     "(7, 0, 3, {reminder}), " \
+                     "(14, 0, 3, {reminder})"\
+            .format(reminder=reminder_id)
 
         logging.debug("inserting into reminder_frequency: %s", sql_string)
         cursor.execute(sql_string)
