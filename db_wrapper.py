@@ -313,8 +313,8 @@ class DBWrapper:
             return row[0]
 
         # lets create a new user
-        sql_string = "INSERT INTO sruser (account_active, account_creation_date, email, brand) " \
-                     "VALUES  (1, '{created}', '{email}', '{brand}')"\
+        sql_string = "INSERT INTO sruser (account_active, account_creation_date, email, version, brand) " \
+                     "VALUES  (1, '{created}', '{email}', 0, '{brand}')"\
             .format(created=acct_creation.strftime('%Y/%m/%d'),
                     email=email,
                     brand=brand)
@@ -362,8 +362,9 @@ class DBWrapper:
 
         sql_string = "INSERT INTO reminder (active, short_description, version, " \
                      "created, updated, day_no, month_no, year_no, special_note, " \
-                     "brand_id, occasion, owner) " \
-                     "VALUES (1, '', 0, '{on}', '{on}', {day}, {month}, {year}, '{note}', {brand}, {occasion}, {owner})"\
+                     "brand_id, occasion, owner, deleted) " \
+                     "VALUES (1, '', 0, '{on}', '{on}', {day}, {month}, {year}, '{note}', {brand}, " \
+                     "{occasion}, {owner}, 0)"\
             .format(on=created.strftime('%Y/%m/%d'),
                     day=occ_date.strftime('%d'),
                     month=occ_date.strftime('%m'),
